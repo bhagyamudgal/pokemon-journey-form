@@ -6,15 +6,55 @@ import MenuItem from "@mui/material/MenuItem";
 import FormControl from "@mui/material/FormControl";
 import InputLabel from "@mui/material/InputLabel";
 import Select from "@mui/material/Select";
-import Slider from "@mui/material/Slider";
 import Switch from "@mui/material/Switch";
+import {
+	CustomButton,
+	ErrorText,
+	Text,
+	Text2,
+	CustomSlider,
+	Heading,
+	SubHeading,
+	FieldContainer,
+} from "../CommonComponents";
 
-function ItemModal({ isModalOpen, closeModal, setCart }) {
+function ItemModal({
+	isItemModalOpen,
+	closeItemModal,
+	setCart,
+	cart,
+	setEditItem,
+	editItem,
+}) {
 	const [item, setItem] = useState("");
 	const [wantBag, setWantBag] = useState(false);
 	const [quantity, setQuantity] = useState(0);
 	const [cost, setCost] = useState(0);
 
+	// errors state
+	const [errors, setErrors] = useState({
+		item: { status: false, message: "" },
+		quantity: { status: false, message: "" },
+	});
+
+	// function runs when item is edited
+	useEffect(() => {
+		if (editItem) {
+			setItem(editItem.name);
+			setQuantity(editItem.quantity);
+			setWantBag(editItem.wantBag);
+		}
+	}, [editItem]);
+
+	// ids of each item
+	const nameToIds = {
+		"Poke Ball": 1,
+		"Great Ball": 2,
+		"Super Potion": 3,
+		"Hyper Potion": 4,
+	};
+
+	// prices for each item
 	const prices = {
 		"Poke Ball": 5,
 		"Great Ball": 10,
@@ -22,18 +62,22 @@ function ItemModal({ isModalOpen, closeModal, setCart }) {
 		"Hyper Potion": 20,
 	};
 
+	// function to set wantBag
 	const handleBagSwitch = (event) => {
 		setWantBag(event.target.checked);
 	};
 
+	// function to set item
 	const handleItem = (event) => {
 		setItem(event.target.value);
 	};
 
+	// function to set quantity
 	const handleQuantity = (event) => {
 		setQuantity(event.target.value);
 	};
 
+	// function to calculate cost
 	const calculateCost = () => {
 		if (item.length > 0) {
 			let cost = prices[item] * quantity;
@@ -47,26 +91,133 @@ function ItemModal({ isModalOpen, closeModal, setCart }) {
 	};
 
 	useEffect(() => {
+		if (item.length > 0) {
+			setErrors((prevState) => {
+				return {
+					...prevState,
+					item: { status: false, message: "" },
+				};
+			});
+		}
+
+		if (quantity > 0) {
+			setErrors((prevState) => {
+				return {
+					...prevState,
+					quantity: {
+						status: false,
+						message: "",
+					},
+				};
+			});
+		}
+
 		calculateCost();
 	}, [item, quantity, wantBag]);
 
+	// function to add item to cart / edit item in cart
 	const addToCartHandler = () => {
-		if (item.length > 0 && quantity > 0) {
-			setCart((prevState) => {
-				return [
+		if (item.length === 0) {
+			setErrors((prevState) => {
+				return {
 					...prevState,
-					{ name: item, price: prices[item], quantity },
-				];
+					item: { status: true, message: "Please select an item!" },
+				};
 			});
+
+			return;
+		} else {
+			setErrors((prevState) => {
+				return {
+					...prevState,
+					item: { status: false, message: "" },
+				};
+			});
+		}
+
+		if (quantity === 0) {
+			setErrors((prevState) => {
+				return {
+					...prevState,
+					quantity: {
+						status: true,
+						message: "Quantity must be greater than 0!",
+					},
+				};
+			});
+
+			return;
+		} else {
+			setErrors((prevState) => {
+				return {
+					...prevState,
+					quantity: {
+						status: false,
+						message: "",
+					},
+				};
+			});
+		}
+
+		if (item.length > 0 && quantity > 0) {
+			let itemAlreadyPresentInCart = false;
+
+			cart.forEach((cartItem) => {
+				if (cartItem.name === item) {
+					itemAlreadyPresentInCart = true;
+				}
+			});
+
+			if (editItem) {
+				cart.forEach((cartItem) => {
+					if (cartItem.id === editItem.id) {
+						cartItem.quantity = quantity;
+						cartItem.wantBag = wantBag;
+						cartItem.cost = cost;
+					}
+				});
+				setCart([...cart]);
+				setEditItem(null);
+			} else if (itemAlreadyPresentInCart) {
+				cart.forEach((cartItem) => {
+					if (cartItem.name === item) {
+						cartItem.quantity = quantity;
+						cartItem.wantBag = wantBag;
+						cartItem.cost = cost;
+					}
+				});
+				setCart([...cart]);
+				itemAlreadyPresentInCart = false;
+			} else {
+				setCart((prevState) => {
+					return [
+						...prevState,
+						{
+							id: nameToIds[item],
+							name: item,
+							price: prices[item],
+							quantity,
+							wantBag,
+							cost,
+						},
+					];
+				});
+			}
+
+			setItem("");
+			setCost(0);
+			setQuantity(0);
+			setWantBag(false);
+			closeItemModal();
 		}
 	};
 
 	return (
 		<Modal
-			open={isModalOpen}
-			onClose={closeModal}
-			aria-labelledby="add-modal"
-			aria-describedby="add-modal"
+			open={isItemModalOpen}
+			onClose={closeItemModal}
+			aria-labelledby="item-modal"
+			aria-describedby="item-modal"
 			style={{
 				display: "flex",
 				alignItems: "center",
@@ -87,6 +238,8 @@ function ItemModal({ isModalOpen, closeModal, setCart }) {
 							id="item"
 							value={item}
 							onChange={handleItem}
+							disabled={editItem ? true : false}
+							error={errors?.item?.status}
 						>
 							<MenuItem value="Poke Ball">Poke Ball</MenuItem>
 							<MenuItem value="Great Ball">Great Ball</MenuItem>
@@ -97,6 +250,10 @@ function ItemModal({ isModalOpen, closeModal, setCart }) {
 								Hyper Potion
 							</MenuItem>
 						</Select>
+
+						<ErrorText>
+							{errors?.item?.status ? errors?.item?.message : ""}
+						</ErrorText>
 					</FormControl>
 				</FieldContainer>
 
@@ -111,6 +268,11 @@ function ItemModal({ isModalOpen, closeModal, setCart }) {
 					/>
 
 					<Text>Select Quantity</Text>
+					<ErrorText>
+						{errors?.quantity?.status
+							? errors?.quantity?.message
+							: ""}
+					</ErrorText>
 				</FieldContainer>
 
 				<FieldContainer
@@ -160,19 +322,20 @@ function ItemModal({ isModalOpen, closeModal, setCart }) {
 }
 
 const Container = styled(Box)`
-	max-width: 400px;
+	max-width: 450px;
 	width: 80vw;
 	padding: 4rem;
+	border: none;
 	border-radius: 10px;
 	background-color: ${(props) => props.theme.palette.light.main};
 	${(props) => props.theme.breakpoints.down("sm")} {
-		padding: 1rem;
+		padding: 3rem 1rem;
 	}
 	box-shadow: 24px;
 	overflow-y: auto;
 	overflow-x: hidden;
 	min-height: 320px;
-	max-height: 60vh;
+	max-height: 80vh;
 	z-index: 20;
 
 	&::-webkit-scrollbar {
@@ -192,94 +355,6 @@ const Container = styled(Box)`
 
 	&::-webkit-scrollbar-thumb:hover {
 		background: ${(props) => props.theme.palette.primary.dark};
-	}
-`;
-
-const Heading = styled.h1`
-	color: ${(props) => props.theme.palette.primary.main};
-	font-size: 32px;
-	text-align: center;
-	margin-bottom: 2.5rem;
-`;
-
-const SubHeading = styled.h1`
-	color: ${(props) => props.theme.palette.gray.light};
-	font-size: 18px;
-	text-align: center;
-	margin-bottom: 2.5rem;
-`;
-
-const FieldContainer = styled.div`
-	width: 100%;
-	margin-bottom: 2.5rem;
-`;
-
-const CustomSlider = styled(Slider)`
-	color: ${(props) => props.theme.palette.primary.main};
-
-	.MuiSlider-track {
-		border: none;
-	}
-
-	.MuiSlider-thumb {
-		height: 15px;
-		width: 15px;
-		background-color: ${(props) => props.theme.palette.primary.main};
-		border: 2px solid currentColor;
-
-		&:focus,
-		&:hover,
-		.Mui-active,
-		.Mui-focusVisible {
-			box-shadow: inherit;
-		}
-		&:before {
-			display: none;
-		}
-	}
-
-	.MuiSlider-valueLabel {
-		line-height: 1.2;
-		font-size: 12px;
-		padding: 0;
-		width: 32px;
-		height: 32px;
-		border-radius: 50% 50% 50% 0;
-		background-color: ${(props) => props.theme.palette.primary.main};
-		transform-origin: bottom left;
-		transform: translate(50%, -100%) rotate(-45deg);
-		&:before {
-			display: none;
-		}
-		.MuiSlider-valueLabelOpen {
-			transform: translate(50%, -100%) rotate(-45deg) scale(1);
-		}
-		& > * {
-			transform: rotate(45deg);
-		}
-	}
-`;
-
-const Text = styled.p`
-	color: ${(props) => props.theme.palette.text.main};
-`;
-
-const Text2 = styled.p`
-	color: ${(props) => props.theme.palette.gray.light};
-`;
-
-const CustomButton = styled.button`
-	border: none;
-	cursor: pointer;
-	border-radius: 5px;
-	padding: 1rem 4rem;
-	background-color: ${(props) => props.theme.palette.primary.main};
-	color: ${(props) => props.theme.palette.light.main};
-	transition: all 0.3s ease-in-out;
-
-	&:hover {
-		transform: scale(1.1);
-		background-color: ${(props) => props.theme.palette.primary.main};
 	}
 `;
 
